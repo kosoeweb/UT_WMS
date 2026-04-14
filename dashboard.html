@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UT - Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { background-color: #f4f6f9; font-family: sans-serif; }
+    .navbar { background: #1e3a8a !important; }
+    .card { border: none; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .navbar-brand { line-height: 1.2; }
+    .info-card { background: #ffffff; border-left: 5px solid #1e3a8a; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold text-white text-decoration-none d-flex align-items-center" href="#">
+        <img src="https://zdifzvpjmmmsfitjsraw.supabase.co/storage/v1/object/sign/Logo/UT%20Logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84MjVmNmZkNy1mZTM3LTQzNWItOWFhMi1jZGQ4ZjY5NWM0NGYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJMb2dvL1VUIExvZ28ucG5nIiwiaWF0IjoxNzc2MTYxNTMyLCJleHAiOjIwOTE1MjE1MzJ9.m1SFbDusZJ0EIqrDjog_Pok2FMzYGtVhV0hmrogL-3Q" alt="UT Logo" style="height: 45px; margin-right: 15px; border-radius: 6px;">
+        <div style="line-height: 1.2;">
+          Universal Tractor Co., Ltd.<br>
+          <small style="font-size: 0.8rem; font-weight: 400; letter-spacing: 0.5px;">Warehouse Management System</small>
+        </div>
+      </a>
+      <div id="navButtons">
+        <a href="index.html" class="btn btn-outline-light btn-sm mx-1">Master Data</a>
+        <a href="transaction.html" class="btn btn-outline-light btn-sm mx-1">Transactions</a>
+        <a href="dashboard.html" class="btn btn-light btn-sm mx-1">Dashboard</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid px-4">
+    <div class="card p-4">
+      <h4 class="mb-4 text-primary fw-bold" id="pageTitle">Reporting Dashboard</h4>
+      
+      <div class="row g-3 mb-4 bg-light p-3 rounded border" id="filterRow">
+        <div class="col-md-3">
+          <label class="fw-bold">Filter by Item Code</label>
+          <input list="itemList" id="filterItem" class="form-control border-primary border-2" placeholder="Type or Select Active Item" onchange="renderView()">
+          <datalist id="itemList"></datalist>
+        </div>
+        <div class="col-md-2">
+          <label class="fw-bold">Filter by Txn ID</label>
+          <input list="txnList" id="filterTxn" class="form-control" placeholder="Txn ID" onchange="renderView()">
+          <datalist id="txnList"></datalist>
+        </div>
+        <div class="col-md-2">
+          <label class="fw-bold text-secondary">From Date</label>
+          <input type="date" id="filterDateFrom" class="form-control" onchange="renderView()">
+        </div>
+        <div class="col-md-2">
+          <label class="fw-bold text-secondary">To Date</label>
+          <input type="date" id="filterDateTo" class="form-control" onchange="renderView()">
+        </div>
+        <div class="col-md-3 text-end align-self-end">
+          <button class="btn btn-secondary me-2" onclick="clearFilters()">Clear</button>
+          <button class="btn btn-success" onclick="exportExcel()">Export</button>
+        </div>
+      </div>
+
+      <div id="loadingSpinner" style="display:none;" class="text-center py-5 text-primary fw-bold">
+        <div class="spinner-border mb-3" role="status"></div><br>Loading Data...
+      </div>
+
+      <div id="defaultSummaryView">
+        <h5 class="text-secondary fw-bold mb-3"><i class="bi bi-box-seam"></i> Active Items Stock Balance Summary</h5>
+        <div class="table-responsive">
+          <table class="table table-hover table-bordered table-sm align-middle text-center shadow-sm">
+            <thead class="table-dark">
+              <tr>
+                <th width="8%">Photo</th>
+                <th width="15%">Item Code</th>
+                <th width="30%">Item Name</th>
+                <th width="15%">Location</th>
+                <th width="12%">Balance Stock</th>
+                <th width="20%">Latest IN Date</th>
+              </tr>
+            </thead>
+            <tbody id="defaultStockBody">
+              <tr><td colspan="6" class="py-4 text-muted">Loading Data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="filteredDetailView" style="display: none;">
+        <div class="card info-card mb-4 shadow-sm" id="itemInfoCard" style="display: none;">
+          <div class="card-body d-flex flex-wrap align-items-center">
+             <img id="infoPhoto" src="" alt="Item Image" style="width:130px; height:130px; object-fit:cover; border-radius:8px; margin-right:25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display:none;">
+             <div class="flex-grow-1 mt-3 mt-md-0">
+                <h4 id="infoName" class="fw-bold text-primary mb-2"></h4>
+                <div class="row g-2 text-dark">
+                   <div class="col-md-4"><strong>Code:</strong> <span id="infoCode" class="text-secondary"></span></div>
+                   <div class="col-md-4"><strong>Category:</strong> <span id="infoCat" class="text-secondary"></span> <span class="text-muted">></span> <span id="infoSubcat" class="text-secondary"></span></div>
+                   <div class="col-md-4"><strong>Size:</strong> <span id="infoSize" class="text-secondary"></span></div>
+                   <div class="col-md-4"><strong>Other Name:</strong> <span id="infoOther" class="text-secondary"></span></div>
+                   <div class="col-md-8"><strong>Description:</strong> <span id="infoDesc" class="text-secondary"></span></div>
+                   <div class="col-12 border-top pt-2 mt-2"><strong>Remark:</strong> <span id="infoRemark" class="text-secondary"></span></div>
+                </div>
+             </div>
+          </div>
+        </div>
+
+        <div id="locationSummaryContainer" class="mb-5" style="display: none;">
+          <h5 class="text-primary fw-bold">Stock By Location</h5>
+          <table class="table table-bordered table-sm w-75 shadow-sm">
+            <thead class="table-primary">
+              <tr>
+                <th>Location</th>
+                <th>Latest IN Date</th>
+                <th>Latest Remark</th>
+                <th class="text-end">Balance Stock</th>
+              </tr>
+            </thead>
+            <tbody id="locSummaryBody"></tbody>
+            <tfoot class="table-light fw-bold" id="locSummaryFoot"></tfoot>
+          </table>
+        </div>
+
+        <h5 class="text-secondary fw-bold">Detailed Transaction Ledger</h5>
+        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+          <table class="table table-hover table-bordered table-sm align-middle" id="reportTable">
+            <thead class="table-dark sticky-top">
+              <tr>
+                <th>Date</th>
+                <th>Txn ID</th>
+                <th>Type</th>
+                <th>Item Code</th>
+                <th>Item Name</th>
+                <th>Location</th>
+                <th>Qty</th>
+                <th>Line Remark</th>
+                <th>Global Remark</th>
+              </tr>
+            </thead>
+            <tbody id="reportBody"></tbody>
+            <tfoot class="table-light fw-bold" id="reportFoot" style="display:none;">
+              <tr>
+                <td colspan="6" class="text-end">TOTAL BALANCE QUANTITY:</td>
+                <td id="totalTxnQtyCell" class="fs-5">0</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div> 
+    </div>
+  </div>
+
+  <script src="supabase-config.js"></script>
+  <script src="auth-wms.js"></script>
+
+  <script>
+    let rawData = [];
+    let activeItems = [];
+    
+    window.onload = async function() {
+      document.getElementById('loadingSpinner').style.display = 'block';
+
+      const { data: itemsData } = await supabase.from('wms_items').select('*');
+      if(itemsData) activeItems = itemsData.filter(i => i.status !== 'Inactive');
+      
+      const { data: txnsData } = await supabase.from('wms_transactions').select('*').order('created_at', { ascending: false });
+      rawData = txnsData || [];
+
+      document.getElementById('loadingSpinner').style.display = 'none';
+      populateFilters();
+      renderView();
+    }
+
+    function populateFilters() {
+      let itemCodes = [...new Set(activeItems.map(i => i.code))];
+      let txns = [...new Set(rawData.map(r => r.txn_id))];
+      itemCodes.sort((a, b) => a.localeCompare(b));
+      
+      document.getElementById('itemList').innerHTML = itemCodes.map(i => `<option value="${i}">`).join('');
+      document.getElementById('txnList').innerHTML = txns.map(t => `<option value="${t}">`).join('');
+    }
+
+    function clearFilters() {
+        document.getElementById('filterItem').value = '';
+        document.getElementById('filterTxn').value = '';
+        document.getElementById('filterDateFrom').value = '';
+        document.getElementById('filterDateTo').value = '';
+        renderView();
+    }
+
+    // Helper: Compare Dates
+    function isDateInRange(dateStr, fromDateStr, toDateStr) {
+        if (!fromDateStr && !toDateStr) return true;
+        
+        let cleanDate = dateStr.split(',')[0].split(' ')[0].trim(); // DD/MM/YYYY
+        let dParts = cleanDate.split('/');
+        if (dParts.length !== 3) return true; // If format is weird, don't filter it out
+        
+        // Convert row date to YYYY-MM-DD for comparison
+        let rowDate = new Date(`${dParts[2]}-${dParts[1].padStart(2, '0')}-${dParts[0].padStart(2, '0')}`);
+        
+        let fromDate = fromDateStr ? new Date(fromDateStr) : new Date('1900-01-01');
+        let toDate = toDateStr ? new Date(toDateStr) : new Date('2100-01-01');
+
+        return (rowDate >= fromDate && rowDate <= toDate);
+    }
+
+    function renderView() {
+      const fItem = document.getElementById('filterItem').value.toUpperCase().trim();
+      const fTxn = document.getElementById('filterTxn').value.toUpperCase().trim();
+      const fDateFrom = document.getElementById('filterDateFrom').value;
+      const fDateTo = document.getElementById('filterDateTo').value;
+
+      const vDefault = document.getElementById('defaultSummaryView');
+      const vDetail = document.getElementById('filteredDetailView');
+
+      if(fItem === '' && fTxn === '' && fDateFrom === '' && fDateTo === '') {
+        vDefault.style.display = 'block';
+        vDetail.style.display = 'none';
+
+        let summaryMap = {};
+        rawData.forEach(row => {
+          let item = String(row.item).trim(); 
+          let loc = row.location; let type = row.type; let qty = Number(row.qty); let dateStr = row.date_str;
+          
+          if(!activeItems.find(i => i.code.toUpperCase() === item.toUpperCase())) return;
+
+          let key = item + "|||" + loc;
+          if(!summaryMap[key]) summaryMap[key] = { bal: 0, lastIn: "-" };
+          if(type === 'IN') { summaryMap[key].bal += qty; summaryMap[key].lastIn = dateStr; } 
+          else if (type === 'OUT') { summaryMap[key].bal -= qty; }
+        });
+
+        let sortedKeys = Object.keys(summaryMap).sort((a, b) => a.split("|||")[0].toUpperCase().localeCompare(b.split("|||")[0].toUpperCase()));
+
+        let tBodyHtml = '';
+        for(let key of sortedKeys) {
+          if(summaryMap[key].bal <= 0) continue; 
+          
+          let parts = key.split("|||");
+          let itemCode = parts[0]; let loc = parts[1];
+          let itemObj = activeItems.find(i => i.code.toUpperCase() === itemCode.toUpperCase());
+          
+          let name = itemObj ? itemObj.name : itemCode;
+          let photoUrl = itemObj ? itemObj.photoUrl : '';
+          let imgTag = photoUrl ? `<img src="${photoUrl}" style="width:40px; height:40px; object-fit:cover; border-radius:5px;">` : '<span class="text-muted small">No Image</span>';
+
+          tBodyHtml += `<tr>
+            <td>${imgTag}</td>
+            <td class="fw-bold">${itemCode}</td>
+            <td class="text-start">${name}</td>
+            <td>${loc}</td>
+            <td class="fw-bold text-success fs-6">${summaryMap[key].bal}</td>
+            <td class="text-muted small">${summaryMap[key].lastIn}</td>
+          </tr>`;
+        }
+        document.getElementById('defaultStockBody').innerHTML = tBodyHtml !== '' ? tBodyHtml : '<tr><td colspan="6" class="text-center py-4">No Stock Data Available.</td></tr>';
+      
+      } else {
+        vDefault.style.display = 'none';
+        vDetail.style.display = 'block';
+
+        if(fItem) {
+          let itemObj = activeItems.find(i => i.code.toUpperCase() === fItem);
+          if(itemObj) {
+            document.getElementById('itemInfoCard').style.display = 'flex';
+            let pUrl = itemObj.photoUrl; let imgEl = document.getElementById('infoPhoto');
+            if(pUrl) { imgEl.src = pUrl; imgEl.style.display = 'block'; } else { imgEl.style.display = 'none'; }
+            
+            document.getElementById('infoName').innerText = itemObj.name;
+            document.getElementById('infoCode').innerText = itemObj.code;
+            document.getElementById('infoCat').innerText = itemObj.cat;
+            document.getElementById('infoSubcat').innerText = itemObj.subcat || '-';
+            document.getElementById('infoSize').innerText = itemObj.size || '-';
+            document.getElementById('infoOther').innerText = itemObj.other || '-';
+            document.getElementById('infoDesc').innerText = itemObj.desc_text || '-';
+            document.getElementById('infoRemark').innerText = itemObj.remark || '-';
+          } else {
+             document.getElementById('itemInfoCard').style.display = 'none';
+          }
+        } else {
+          document.getElementById('itemInfoCard').style.display = 'none';
+        }
+
+        const tbody = document.getElementById('reportBody');
+        tbody.innerHTML = '';
+        let hasData = false; let locSummary = {}; let totalLedgerQty = 0;
+
+        rawData.forEach(row => {
+          let dateStr = row.date_str; let txnId = row.txn_id; let type = row.type;
+          let item = String(row.item).trim(); let loc = row.location; let qty = Number(row.qty); 
+          let lRemark = row.lineremark || ''; let gRemark = row.globalremark || '';
+
+          let itemObj = activeItems.find(i => i.code.toUpperCase() === item.toUpperCase());
+          if(!itemObj) return; 
+
+          // Location Summary (Item ရွေးထားမှသာ တွက်ချက်မည်)
+          if(fItem && item.toUpperCase() === fItem) {
+            if(!locSummary[loc]) locSummary[loc] = { bal: 0, lastIn: "-", lastRemark: "-" };
+            if(type === 'IN') { 
+              locSummary[loc].bal += qty; locSummary[loc].lastIn = dateStr; locSummary[loc].lastRemark = lRemark || "-"; 
+            } else if (type === 'OUT') { locSummary[loc].bal -= qty; }
+          }
+
+          // Ledger Table အတွက် Filter စစ်ဆေးခြင်း
+          if(fItem && item.toUpperCase() !== fItem) return;
+          if(fTxn && !txnId.toUpperCase().includes(fTxn)) return;
+          if(!isDateInRange(dateStr, fDateFrom, fDateTo)) return;
+
+          hasData = true;
+          if (type === 'IN') { totalLedgerQty += qty; } else if (type === 'OUT') { totalLedgerQty -= qty; }
+          
+          let typeBadge = type === 'IN' ? '<span class="badge bg-success">IN</span>' : '<span class="badge bg-danger">OUT</span>';
+          
+          tbody.innerHTML += `
+            <tr>
+              <td>${dateStr}</td>
+              <td class="fw-bold">${txnId}</td>
+              <td>${typeBadge}</td>
+              <td class="text-primary fw-bold">${item}</td>
+              <td>${itemObj.name}</td>
+              <td>${loc}</td>
+              <td class="fw-bold">${qty}</td>
+              <td class="text-muted">${lRemark}</td>
+              <td class="text-muted">${gRemark}</td>
+            </tr>
+          `;
+        });
+
+        if(!hasData) {
+          tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4">No records found matching your filters.</td></tr>';
+          document.getElementById('reportFoot').style.display = 'none';
+        } else {
+          let totalCell = document.getElementById('totalTxnQtyCell');
+          totalCell.innerText = totalLedgerQty;
+          totalCell.className = totalLedgerQty >= 0 ? 'text-success fw-bold fs-5' : 'text-danger fw-bold fs-5';
+          document.getElementById('reportFoot').style.display = 'table-footer-group';
+        }
+
+        const summaryContainer = document.getElementById('locationSummaryContainer');
+        if(fItem) {
+          let sBody = ''; let totalBal = 0;
+          for(let l in locSummary) {
+            let b = locSummary[l].bal; totalBal += b;
+            sBody += `<tr><td>${l}</td><td>${locSummary[l].lastIn}</td><td>${locSummary[l].lastRemark}</td><td class="text-end fw-bold">${b}</td></tr>`;
+          }
+          document.getElementById('locSummaryBody').innerHTML = sBody !== '' ? sBody : '<tr><td colspan="4" class="text-center">No Stock Found</td></tr>';
+          document.getElementById('locSummaryFoot').innerHTML = `<tr><td colspan="3" class="text-end">TOTAL STOCK BALANCE:</td><td class="text-end text-success fs-5">${totalBal}</td></tr>`;
+          summaryContainer.style.display = 'block';
+        } else {
+          summaryContainer.style.display = 'none';
+        }
+      }
+    }
+
+    function exportExcel() {
+      try {
+        let fItem = document.getElementById('filterItem') ? document.getElementById('filterItem').value.trim() : '';
+        let fTxn = document.getElementById('filterTxn') ? document.getElementById('filterTxn').value.trim() : '';
+        let fFrom = document.getElementById('filterDateFrom') ? document.getElementById('filterDateFrom').value.trim() : '';
+        let fTo = document.getElementById('filterDateTo') ? document.getElementById('filterDateTo').value.trim() : '';
+        
+        // Export ထုတ်မည့် Table ကို ရွေးချယ်ခြင်း
+        let table = (fItem === '' && fTxn === '' && fFrom === '' && fTo === '') 
+                    ? document.querySelector("#defaultSummaryView table") 
+                    : document.getElementById("reportTable");
+
+        if (!table) {
+            Swal.fire('Error', 'No data available to export.', 'error');
+            return;
+        }
+        
+        // Excel Workbook တည်ဆောက်ခြင်း
+        let wb = XLSX.utils.table_to_book(table, {sheet: "Report"});
+        
+        // Online တွင် Download အလုပ်လုပ်စေရန် Binary Array ဖြင့် ပြောင်းလဲခြင်း
+        let wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+        let blob = new Blob([wbout], {type: "application/octet-stream"});
+        let url = URL.createObjectURL(blob);
+        
+        // Download Link ဖန်တီး၍ Click နှိပ်ခိုင်းခြင်း
+        let a = document.createElement("a");
+        document.body.appendChild(a);
+        a.style = "display: none";
+        a.href = url;
+        
+        // ဖိုင်နာမည်တွင် ယနေ့ရက်စွဲပါ တွဲထည့်ပေးခြင်း
+        let today = new Date().toISOString().split('T')[0];
+        a.download = "UT_Report_" + today + ".xlsx";
+        
+        a.click();
+        
+        // Memory ရှင်းလင်းခြင်း
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        
+      } catch (error) {
+        console.error("Excel Export Error: ", error);
+        Swal.fire('Export Failed', 'Please check your browser security settings.', 'error');
+      }
+    }
+  </script>
+</body>
+</html>
