@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UT - Master Data</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { background-color: #f4f6f9; font-family: sans-serif; }
+    .navbar { background: #1e3a8a !important; }
+    .card { border: none; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .navbar-brand { line-height: 1.2; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold text-white text-decoration-none d-flex align-items-center" href="#">
+        <img src="https://zdifzvpjmmmsfitjsraw.supabase.co/storage/v1/object/sign/Logo/UT%20Logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84MjVmNmZkNy1mZTM3LTQzNWItOWFhMi1jZGQ4ZjY5NWM0NGYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJMb2dvL1VUIExvZ28ucG5nIiwiaWF0IjoxNzc2MTYxNTMyLCJleHAiOjIwOTE1MjE1MzJ9.m1SFbDusZJ0EIqrDjog_Pok2FMzYGtVhV0hmrogL-3Q" alt="UT Logo" style="height: 45px; margin-right: 15px; border-radius: 6px;">
+          <div style="line-height: 1.2;">
+          Universal Tractor Co., Ltd.<br>
+          <small style="font-size: 0.8rem; font-weight: 400; letter-spacing: 0.5px;">Warehouse Management System</small>
+        </div>
+      </a>
+      <div>
+        <a href="index.html" class="btn btn-light btn-sm mx-1">Master Data</a>
+        <a href="transaction.html" class="btn btn-outline-light btn-sm mx-1">Transactions</a>
+        <a href="dashboard.html" class="btn btn-outline-light btn-sm mx-1">Dashboard</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card p-4">
+      <h4 class="mb-4">Master Data Setup</h4>
+      <ul class="nav nav-tabs mb-4">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#createItem">Create Item</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#editItem">Edit Item</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#location">Locations</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#settings">Categories Setup</a></li>
+      </ul>
+
+      <div class="tab-content">
+        
+        <div class="tab-pane fade show active" id="createItem">
+          <form id="formCreate" onsubmit="handleItemSubmit(event, 'create')">
+            <div class="row g-3">
+              <div class="col-md-3"><label class="fw-bold">Item Code</label><input type="text" class="form-control" name="code" required></div>
+              <div class="col-md-3"><label class="fw-bold">Name</label><input type="text" class="form-control" name="name" required></div>
+              <div class="col-md-3">
+                <label class="fw-bold">Category</label>
+                <select class="form-select cat-dropdown" name="cat" onchange="updateSubcats(this, 'create-subcat')" required></select>
+              </div>
+              <div class="col-md-3">
+                <label class="fw-bold">Sub-category</label>
+                <select class="form-select create-subcat" name="subcat"><option value="">Select Category First</option></select>
+              </div>
+              <div class="col-md-3"><label class="fw-bold">Size</label><input type="text" class="form-control" name="size"></div>
+              <div class="col-md-3"><label class="fw-bold">Other Name</label><input type="text" class="form-control" name="other"></div>
+              <div class="col-md-3"><label class="fw-bold">Photo Upload</label><input type="file" class="form-control" id="photoFile" accept="image/*"></div>
+              <div class="col-md-3"><label class="fw-bold">Description</label><input type="text" class="form-control" name="desc_text"></div>
+              <div class="col-md-12">
+                <label class="fw-bold">Remark</label>
+                <textarea class="form-control" name="remark" rows="3"></textarea>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3 px-4" id="btnCreate">Save Item</button>
+          </form>
+        </div>
+
+        <div class="tab-pane fade" id="editItem">
+          <form id="formEdit" onsubmit="handleItemSubmit(event, 'edit')">
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                 <label class="fw-bold">Select Item to Edit</label>
+                 <select class="form-select" id="editItemSelect" name="code" onchange="fetchItemData()" required></select>
+              </div>
+              <div class="col-md-3 align-self-end" id="statusContainer" style="display:none;">
+                <label class="fw-bold text-dark mb-2">Item Status</label>
+                <div class="form-check form-switch fs-5">
+                  <input class="form-check-input border-secondary" type="checkbox" id="statusToggle" name="status" checked>
+                  <label class="form-check-label fw-bold text-success" for="statusToggle" id="statusLabel">Active</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="row g-3" id="editFields" style="display:none;">
+              <div class="col-md-3"><label class="fw-bold">Name</label><input type="text" class="form-control" name="name" required></div>
+              <div class="col-md-3"><label class="fw-bold">Category</label>
+                 <select class="form-select cat-dropdown" name="cat" onchange="updateSubcats(this, 'edit-subcat')" required></select>
+              </div>
+              <div class="col-md-3"><label class="fw-bold">Sub-category</label>
+                 <select class="form-select edit-subcat" name="subcat" id="editSubcatSelect"></select>
+              </div>
+              <div class="col-md-3"><label class="fw-bold">Size</label><input type="text" class="form-control" name="size"></div>
+              <div class="col-md-3"><label class="fw-bold">Other Name</label><input type="text" class="form-control" name="other"></div>
+              <div class="col-md-3"><label class="fw-bold">Description</label><input type="text" class="form-control" name="desc_text"></div>
+              
+              <div class="col-md-3">
+                <label class="fw-bold">Current Photo</label><br>
+                <img id="editItemThumbnail" src="" style="max-height: 80px; display: none; border-radius: 5px; border: 1px solid #ccc;" alt="Image preview">
+                <span id="noImageText" class="text-muted" style="display:none; font-size:0.9rem;">No Image</span>
+              </div>
+              <div class="col-md-3"><label class="fw-bold">Update New Photo</label><input type="file" class="form-control" id="editPhotoFile" accept="image/*"></div>
+              
+              <div class="col-md-3 mt-3">
+                <div class="p-3 border rounded text-center bg-white shadow-sm">
+                  <label class="fw-bold text-primary mb-2">Item QR Code</label><br>
+                  <img id="qrCodeImg" src="" style="width:130px; height:130px; display:none; border-radius: 5px;" alt="QR Code">
+                  <br>
+                  <a id="qrDownloadBtn" href="#" target="_blank" class="btn btn-sm btn-outline-primary mt-2" style="display:none;">View & Download</a>
+                </div>
+              </div>
+
+              <div class="col-md-9 mt-3">
+                <label class="fw-bold">Remark</label>
+                <textarea class="form-control" name="remark" rows="4"></textarea>
+              </div>
+              <input type="hidden" name="photoUrl" id="existingPhotoUrl">
+              <div class="col-md-12"><button type="submit" class="btn btn-success px-4" id="btnEdit">Update Item</button></div>
+            </div>
+          </form>
+        </div>
+
+        <div class="tab-pane fade" id="location">
+          <form id="formLocation" onsubmit="submitLocationForm(event)">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <input type="text" id="mainLocationInput" list="mainLocList" class="form-control" name="main" placeholder="Main Location (e.g., Warehouse A)" required autocomplete="off">
+                <datalist id="mainLocList"></datalist>
+              </div>
+              <div class="col-md-4">
+                <input type="text" class="form-control" name="sub" placeholder="Sub Location (e.g., Shelf 1)" required>
+              </div>
+              <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100">Add Location</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="tab-pane fade" id="settings">
+          <form onsubmit="addSettingPair(event)">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="fw-bold">Category</label>
+                <input type="text" id="pairCat" list="mainCatList" class="form-control" name="cat" required placeholder="e.g. Battery" autocomplete="off">
+                <datalist id="mainCatList"></datalist>
+              </div>
+              <div class="col-md-4">
+                <label class="fw-bold">Sub-category</label>
+                <input type="text" id="pairSubcat" class="form-control" name="subcat" placeholder="e.g. Din (Optional)">
+              </div>
+              <div class="col-md-4 align-self-end">
+                <button type="submit" class="btn btn-secondary w-100">Add Category Pair</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="auth-wms.js"></script>
+  
+  <script>
+    let globalItems = [];
+    let globalSettings = {};
+
+    document.getElementById('statusToggle').addEventListener('change', function() {
+      let lbl = document.getElementById('statusLabel');
+      if(this.checked) {
+        lbl.innerText = 'Active'; lbl.className = 'form-check-label fw-bold text-success';
+      } else {
+        lbl.innerText = 'Inactive (Deactivated)'; lbl.className = 'form-check-label fw-bold text-danger';
+      }
+    });
+
+    window.onload = function() { 
+      loadSettings(); 
+      loadItems(); 
+      loadSetupDatalists(); 
+    }
+
+    function compressImage(file, maxWidth, quality) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width; let height = img.height;
+            if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+            canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob) => {
+              resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+            }, 'image/jpeg', quality);
+          };
+          img.onerror = error => reject(error);
+        };
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    async function loadSettings() {
+      const { data, error } = await supabase.from('wms_settings').select('*');
+      if (error) return;
+      globalSettings = {};
+      data.forEach(row => {
+        let cat = row.cat ? row.cat.trim() : "";
+        let sub = row.subcat ? row.subcat.trim() : "";
+        if(cat !== "") {
+          if(!globalSettings[cat]) globalSettings[cat] = [];
+          if(sub !== "" && !globalSettings[cat].includes(sub)) globalSettings[cat].push(sub);
+        }
+      });
+      let catHtml = '<option value="">Select Category...</option>';
+      for(let cat in globalSettings) { catHtml += `<option value="${cat}">${cat}</option>`; }
+      document.querySelectorAll('.cat-dropdown').forEach(el => el.innerHTML = catHtml);
+    }
+
+    function updateSubcats(catSelectEl, targetClass) {
+      let cat = catSelectEl.value;
+      let form = catSelectEl.closest('form');
+      let subcatSelect = form.querySelector('.' + targetClass);
+      let html = '<option value="">Select Sub-category...</option>';
+      if(cat && globalSettings[cat]) {
+        globalSettings[cat].forEach(sub => { html += `<option value="${sub}">${sub}</option>`; });
+      }
+      subcatSelect.innerHTML = html;
+    }
+
+    async function loadItems() {
+      const { data, error } = await supabase.from('wms_items').select('*').order('code');
+      if (error) return;
+      globalItems = data;
+      let html = '<option value="">Select Item...</option>' + data.map(i => `<option value="${i.code}">${i.code} - ${i.name} ${i.status === 'Inactive' ? '(Deactivated)' : ''}</option>`).join('');
+      document.getElementById('editItemSelect').innerHTML = html;
+    }
+
+    async function loadSetupDatalists() {
+      try {
+        const { data: catData } = await supabase.from('wms_settings').select('cat');
+        if (catData) {
+            let uniqueCats = [...new Set(catData.map(item => item.cat).filter(c => c))]; 
+            document.getElementById('mainCatList').innerHTML = uniqueCats.map(c => `<option value="${c}">`).join('');
+        }
+        const { data: locData } = await supabase.from('wms_locations').select('main'); 
+        if (locData) {
+            let uniqueLocs = [...new Set(locData.map(item => item.main).filter(l => l))]; 
+            document.getElementById('mainLocList').innerHTML = uniqueLocs.map(l => `<option value="${l}">`).join('');
+        }
+      } catch (error) { console.error(error); }
+    }
+
+    async function submitLocationForm(e) {
+      e.preventDefault();
+      let form = e.target;
+      let data = Object.fromEntries(new FormData(form).entries());
+      const { error } = await supabase.from('wms_locations').insert([data]);
+      if(error) { Swal.fire('Error', error.message, 'error'); } 
+      else { Swal.fire('Success', 'Location added', 'success'); form.reset(); loadSetupDatalists(); }
+    }
+
+    async function addSettingPair(e) {
+      e.preventDefault();
+      let cat = document.getElementById('pairCat').value;
+      let subcat = document.getElementById('pairSubcat').value;
+      const { error } = await supabase.from('wms_settings').insert([{ cat, subcat }]);
+      if(error) { Swal.fire('Error', error.message, 'error'); } 
+      else { 
+        Swal.fire('Added', 'Category Saved', 'success'); 
+        document.getElementById('pairCat').value = ''; document.getElementById('pairSubcat').value = ''; 
+        loadSettings(); loadSetupDatalists(); 
+      }
+    }
+
+    async function handleItemSubmit(e, action) {
+      e.preventDefault();
+      let btn = action === 'create' ? document.getElementById('btnCreate') : document.getElementById('btnEdit');
+      btn.disabled = true; btn.innerText = "Uploading...";
+      
+      let form = e.target; 
+      let data = Object.fromEntries(new FormData(form).entries());
+      let fileInput = action === 'create' ? document.getElementById('photoFile') : document.getElementById('editPhotoFile');
+      
+      if(action === 'edit') {
+        data.status = document.getElementById('statusToggle').checked ? 'Active' : 'Inactive';
+      } else {
+        data.status = 'Active'; 
+      }
+
+      try {
+        if(fileInput.files.length > 0) {
+          let file = fileInput.files[0];
+          let compressedFile = await compressImage(file, 800, 0.7);
+          let safeName = compressedFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+          let fileName = `item_${data.code || Date.now()}_${Date.now()}_${safeName}`;
+          
+          const { error: uploadError } = await supabase.storage.from('wms_photos').upload(fileName, compressedFile);
+          if (uploadError) throw uploadError;
+          
+          const { data: urlData } = supabase.storage.from('wms_photos').getPublicUrl(fileName);
+          data.photoUrl = urlData.publicUrl;
+        } else {
+          data.photoUrl = action === 'edit' ? document.getElementById('existingPhotoUrl').value : "";
+        }
+
+        btn.innerText = "Saving to Database...";
+
+        if(action === 'create') {
+          const { error } = await supabase.from('wms_items').insert([data]);
+          if(error) throw error;
+          Swal.fire('Success', 'New Item Saved', 'success');
+          form.reset();
+        } else {
+          const { error } = await supabase.from('wms_items').update(data).eq('code', data.code);
+          if(error) throw error;
+          Swal.fire('Success', 'Item Updated', 'success');
+        }
+        
+        loadItems(); 
+      } catch (err) {
+        Swal.fire('Error', err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = action === 'create' ? "Save Item" : "Update Item";
+      }
+    }
+
+    function fetchItemData() {
+      const code = document.getElementById('editItemSelect').value;
+      const item = globalItems.find(i => i.code === code);
+      if(item) {
+        document.getElementById('editFields').style.display = 'flex';
+        document.getElementById('statusContainer').style.display = 'block';
+        let frm = document.getElementById('formEdit');
+        
+        frm.name.value = item.name; frm.desc_text.value = item.desc_text || ''; 
+        frm.cat.value = item.cat; updateSubcats(frm.cat, 'edit-subcat'); frm.subcat.value = item.subcat || ''; 
+        frm.size.value = item.size || ''; frm.other.value = item.other || ''; frm.remark.value = item.remark || '';
+
+        let status = item.status || 'Active';
+        let toggle = document.getElementById('statusToggle');
+        toggle.checked = (status === 'Active'); toggle.dispatchEvent(new Event('change'));
+        
+        let photoData = item.photoUrl;
+        let thumbImg = document.getElementById('editItemThumbnail');
+        let noImgText = document.getElementById('noImageText');
+        document.getElementById('existingPhotoUrl').value = photoData || "";
+        
+        if(photoData) {
+          thumbImg.src = photoData; thumbImg.style.display = 'block'; noImgText.style.display = 'none';
+        } else {
+          thumbImg.src = ""; thumbImg.style.display = 'none'; noImgText.style.display = 'block';
+        }
+
+        // ✅ URL မှန်ကန်စွာ ချိတ်ဆက်ပြီး QR Generate လုပ်ခြင်း (Checker.html သို့ ညွှန်းပါသည်)
+        let fullPath = window.location.origin + window.location.pathname;
+        let directoryPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
+        let checkerUrl = directoryPath + "/checker.html?item=" + encodeURIComponent(item.code);
+        let qrData = encodeURIComponent(checkerUrl);
+        let qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=" + qrData;
+        
+        let qrImg = document.getElementById('qrCodeImg');
+        qrImg.src = qrUrl; qrImg.style.display = 'inline-block';
+        
+        let qrBtn = document.getElementById('qrDownloadBtn');
+        qrBtn.href = qrUrl; qrBtn.style.display = 'inline-block';
+
+      } else {
+        document.getElementById('editFields').style.display = 'none';
+        document.getElementById('statusContainer').style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>

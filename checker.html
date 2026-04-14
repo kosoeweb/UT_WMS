@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UT - Quick Stock Checker</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { background-color: #f0f2f5; font-family: sans-serif; }
+    .header { background: #1e3a8a; color: white; padding: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .search-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 500px; margin: 20px auto; }
+    .result-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; display: none; }
+    .stock-box { border-left: 4px solid #198754; background: #f8f9fa; padding: 12px; margin-bottom: 12px; border-radius: 4px; }
+    .total-box { background-color: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; border-radius: 8px; padding: 15px; text-align: center; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+  <div class="header mb-4 d-flex align-items-center justify-content-center">
+    <img src="https://zdifzvpjmmmsfitjsraw.supabase.co/storage/v1/object/sign/Logo/UT%20Logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84MjVmNmZkNy1mZTM3LTQzNWItOWFhMi1jZGQ4ZjY5NWM0NGYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJMb2dvL1VUIExvZ28ucG5nIiwiaWF0IjoxNzc2MTYxNTMyLCJleHAiOjIwOTE1MjE1MzJ9.m1SFbDusZJ0EIqrDjog_Pok2FMzYGtVhV0hmrogL-3Q" alt="UT Logo" style="height: 45px; margin-right: 15px; border-radius: 6px;">
+    <div class="text-start">
+      <h4 class="m-0 fw-bold">Universal Tractor Co., Ltd.</h4>
+      <small style="font-size: 0.9rem; font-weight: normal; opacity: 0.9;">Quick Stock Checker</small>
+    </div>
+  </div>
+
+  <div class="container px-3">
+    
+    <div id="searchContainer" class="search-card">
+      <h5 class="fw-bold mb-3 text-center text-primary">Search Item</h5>
+      <div class="mb-4">
+        <label class="form-label text-muted small fw-bold">Item Code (Type or Select)</label>
+        <input list="itemList" id="searchBox" class="form-control form-control-lg border-primary" placeholder="Type Item Code...">
+        <datalist id="itemList"></datalist>
+      </div>
+      <button class="btn btn-primary btn-lg w-100 fw-bold shadow-sm" onclick="checkStock()">
+        🔍 Check Stock
+      </button>
+      
+      <a href="login.html" class="btn btn-outline-secondary w-100 mt-3 fw-bold">🏠 Login to System</a>
+    </div>
+
+    <div id="resultContainer" class="result-card pb-4 mb-5">
+      <div class="text-center mb-3">
+         <img id="resImg" src="" style="height: 100px; width: 100px; object-fit: cover; border-radius: 8px; display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2);" alt="Item Photo">
+      </div>
+      <h5 id="resName" class="text-primary fw-bold text-center mb-1"></h5>
+      <p id="resCode" class="text-center text-muted small mb-3"></p>
+      
+      <div class="total-box shadow-sm">
+        <h6 class="m-0 text-uppercase fw-bold opacity-75">Total Quantity</h6>
+        <h2 class="m-0 fw-bold mt-1" id="resTotalQty">0</h2>
+      </div>
+
+      <div class="mb-3 bg-light p-3 rounded border">
+        <strong>Category:</strong> <span id="resCat"></span><br>
+        <strong>Other Name:</strong> <span id="resOther" class="text-primary fw-bold"></span><br>
+        <strong>Description:</strong> <span id="resDesc"></span>
+      </div>
+
+      <h6 class="fw-bold border-bottom pb-2 mt-4 text-success">📍 Location & Balance</h6>
+      <div id="resStock"></div>
+      
+      <button class="btn btn-outline-primary w-100 mt-4 fw-bold" onclick="resetSearch()">🔍 New Search</button>
+    </div>
+
+  </div>
+
+  <script src="supabase-config.js"></script>
+
+  <script>
+    window.onload = async function() {
+      // ၁။ Dropdown အတွက် Data များ ဆွဲယူခြင်း
+      const { data, error } = await supabase.from('wms_items').select('code, name').eq('status', 'Active');
+      if (data) {
+        let options = '';
+        data.forEach(item => {
+          options += `<option value="${item.code}">${item.code} - ${item.name}</option>`;
+        });
+        document.getElementById('itemList').innerHTML = options;
+      }
+
+      // ၂။ QR Code မှတဆင့် Scan ဖတ်လာပါက URL Parameter ကို စစ်ဆေးခြင်း
+      const urlParams = new URLSearchParams(window.location.search);
+      const scannedCode = urlParams.get('item');
+      if (scannedCode) {
+        document.getElementById('searchBox').value = scannedCode;
+        checkStock(); // Code တွေ့ပါက အလိုအလျောက် Search လုပ်မည်
+      }
+    }
+
+    async function checkStock() {
+      let code = document.getElementById('searchBox').value.trim();
+      
+      if(code.includes(' - ')) { code = code.split(' - ')[0].trim(); }
+
+      if(!code) {
+        Swal.fire('Notice', 'Please enter an Item Code.', 'warning');
+        return;
+      }
+
+      Swal.fire({ title: 'Searching...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+      document.getElementById('searchContainer').style.display = 'none';
+
+      try {
+        // Table Name များကို wms_ ဖြင့် မှန်ကန်စွာ ချိတ်ဆက်ထားပါသည်
+        const { data: itemData, error: itemErr } = await supabase.from('wms_items').select('*').eq('code', code).single();
+        
+        if (itemErr || !itemData) throw new Error("Item Code not found in the system.");
+
+        const { data: txnData } = await supabase.from('wms_transactions').select('*').eq('item', code).order('created_at', { ascending: true });
+        
+        let locSummary = {};
+        let totalQty = 0;
+
+        if (txnData) {
+          txnData.forEach(t => {
+            let loc = t.location;
+            let type = t.type;
+            let qty = Number(t.qty) || 0;
+            let remark = t.lineremark || "";
+            let dateStr = t.date_str;
+
+            if(!locSummary[loc]) locSummary[loc] = { bal: 0, lastIn: "-", latestRemark: "-" };
+
+            if(type === 'IN') {
+              locSummary[loc].bal += qty;
+              totalQty += qty;
+              locSummary[loc].lastIn = dateStr; 
+              if(remark !== "") locSummary[loc].latestRemark = remark;
+            } else if (type === 'OUT') {
+              locSummary[loc].bal -= qty;
+              totalQty -= qty;
+              if(remark !== "") locSummary[loc].latestRemark = remark;
+            }
+          });
+        }
+
+        showResult(itemData, locSummary, totalQty);
+
+      } catch (err) {
+        Swal.fire('Not Found', err.message, 'warning').then(resetSearch);
+      }
+    }
+
+    function showResult(details, stockObj, totalQty) {
+      Swal.close();
+      
+      document.getElementById('resName').innerText = details.name;
+      document.getElementById('resCode').innerText = "Code: " + details.code;
+      document.getElementById('resCat').innerText = (details.cat || "") + " / " + (details.subcat || "");
+      document.getElementById('resOther').innerText = details.other || "-";
+      document.getElementById('resDesc').innerText = details.desc_text || "-";
+      document.getElementById('resTotalQty').innerText = totalQty;
+
+      let imgEl = document.getElementById('resImg');
+      if(details.photoUrl) {
+         imgEl.src = details.photoUrl;
+         imgEl.style.display = 'inline-block';
+      } else { 
+         imgEl.style.display = 'none'; 
+      }
+
+      let stockHtml = '';
+      let hasStock = false;
+      
+      for(let loc in stockObj) {
+        let s = stockObj[loc];
+        if(s.bal !== 0) { 
+          hasStock = true;
+          let color = s.bal > 0 ? "text-success" : "text-danger";
+          let remarkDisplay = s.latestRemark !== "-" ? `<div class="mt-1 small" style="color: #6c757d;">📝 <em>${s.latestRemark}</em></div>` : '';
+          
+          stockHtml += `
+            <div class="stock-box shadow-sm">
+               <div class="d-flex justify-content-between align-items-center">
+                 <span class="fw-bold">${loc}</span>
+                 <span class="fs-4 fw-bold ${color}">${s.bal}</span>
+               </div>
+               <div class="text-muted" style="font-size: 0.85rem;">Last In: ${s.lastIn}</div>
+               ${remarkDisplay}
+            </div>
+          `;
+        }
+      }
+      
+      document.getElementById('resStock').innerHTML = hasStock ? stockHtml : '<div class="alert alert-warning py-2 mt-2 fw-bold text-center">No stock available for this item.</div>';
+      document.getElementById('resultContainer').style.display = 'block';
+    }
+
+    function resetSearch() {
+      // URL တွင် ?item= ရှိနေပါက ဖယ်ရှားပြီး ပုံမှန် Search သို့ ပြန်သွားမည်
+      window.history.pushState({}, document.title, window.location.pathname);
+      document.getElementById('resultContainer').style.display = 'none';
+      document.getElementById('searchContainer').style.display = 'block';
+      document.getElementById('searchBox').value = '';
+      document.getElementById('searchBox').focus();
+    }
+  </script>
+</body>
+</html>
