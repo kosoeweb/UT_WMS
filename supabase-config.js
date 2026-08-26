@@ -1,5 +1,5 @@
 // သင့်ရဲ့ Supabase Project ထဲက တကယ့် URL နဲ့ Key ကို အစားထိုးထည့်ပါ
-const SUPABASE_URL = 'https://supabase-proxy.kosoe-web.workers.dev/';
+const SUPABASE_URL = 'https://supabase-proxy.kosoe-web.workers.dev';
 const SUPABASE_ANON_KEY = 'sb_publishable_Eghy_AeArZhWU86ETOoWqg_FI8xXh9P';
 
 // ⬇️ ဒီစာကြောင်းက အရေးကြီးဆုံးပါ (Client ဖန်တီးတဲ့ အဆင့်) ⬇️
